@@ -20,6 +20,7 @@ Gem::Specification.new do |spec|
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
 
+  spec.add_dependency 'logging', '~> 2.2'
   spec.add_dependency 'net-http-digest_auth', '~> 1.4'
   spec.add_dependency 'nokogiri', '~> 1.8'
 

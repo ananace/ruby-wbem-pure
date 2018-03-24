@@ -18,13 +18,11 @@ module Wbem
     end
 
     def identify
-      xml = build_soap('xmlns:wsmid' => 'http://schemas.dmtf.org/wbem/wsman/identity/1/wsmanidentity.xsd') do |xml|
+      data = build_soap('xmlns:wsmid' => 'http://schemas.dmtf.org/wbem/wsman/identity/1/wsmanidentity.xsd') do |xml|
         xml['wsmid'].Identify {}
-      end.to_xml
+      end
 
-      resp = post(xml)
-
-      puts resp
+      post(data)
     end
 
     def host
@@ -49,14 +47,16 @@ module Wbem
     end
 
     def post(xml)
-      puts "Sending:\n#{xml}\n"
+      logger.info xml.inspect
+      xml = xml.to_xml(indent: 0) unless xml.is_a? String
 
       req = Net::HTTP::Post.new @url.request_uri
       req.content_type = 'application/xml; charset=utf-8'
       req.body = xml
-      resp = connection.request req
+      print_http(req)
 
-      puts resp.inspect, resp.to_hash, resp.body, ''
+      resp = connection.request req
+      print_http(resp)
       if resp.is_a? Net::HTTPUnauthorized
         auth = digest_auth.auth_header @url, resp['www-authenticate'], 'POST'
 
@@ -65,19 +65,42 @@ module Wbem
         req.body = xml
         req.add_field 'Authorization', auth
 
-        puts "Sending w/digest:\n#{req.inspect}\n#{req.to_hash}\n"
+        print_http(req)
         resp = @connection.request req
-        puts resp.inspect, resp.to_hash, resp.body, ''
+        print_http(resp)
       end
 
-      resp
+      if resp #.is_a? Net::HTTPOK
+        return Nokogiri::XML(resp.body)
+      else
+        nil # TODO: Exceptions
+      end
     end
 
     def digest_auth
       @digest_auth ||= begin
         auth = Net::HTTP::DigestAuth.new
         auth.next_nonce
+        auth
       end
+    end
+
+    def print_http(http)
+      dir = http.is_a?(Net::HTTPRequest) ? '>' : '<'
+
+      if http.is_a? Net::HTTPRequest
+        logger.debug "#{dir} #{http.method} #{http.path}"
+      else
+        logger.debug "#{dir} #{http.code} #{http.message}"
+      end
+      http.each_header do |k,v|
+        logger.debug "#{dir} #{k}: #{v}"
+      end
+      logger.debug "#{dir}"
+    end
+
+    def logger
+      Wbem.logger
     end
       
     attr_reader :connection
