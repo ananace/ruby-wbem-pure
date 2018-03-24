@@ -74,7 +74,10 @@ module Wbem
     end
 
     def digest_auth
-      @digest_auth ||= Net::HTTP::DigestAuth.new
+      @digest_auth ||= begin
+        auth = Net::HTTP::DigestAuth.new
+        auth.next_nonce
+      end
     end
       
     attr_reader :connection
