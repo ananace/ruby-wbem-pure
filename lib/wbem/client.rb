@@ -63,9 +63,9 @@ module Wbem
       end
 
       actionNS = case method
-                 when :subscribe, :unsubscribe
-                   'http://schemas.xmlsoap.org/ws/2004/09/transfer'
                  when :create, :delete, :get, :put
+                   'http://schemas.xmlsoap.org/ws/2004/09/transfer'
+                 when :subscribe, :unsubscribe
                    'http://schemas.xmlsoap.org/ws/2004/08/eventing'
                  when :enumerate, :pull
                    'http://schemas.xmlsoap.org/ws/2004/09/enumeration'
@@ -151,8 +151,8 @@ module Wbem
     end
 
     def post_data(xml)
-      logger.info xml.inspect
       xml = xml.to_xml(indent: 0) unless xml.is_a? String
+      logger.info xml.inspect
 
       req = Net::HTTP::Post.new @url.request_uri
       req.content_type = 'application/xml; charset=utf-8'
