@@ -20,7 +20,7 @@ module Wbem
     end
 
     def identify
-      post_data(build_soap(:identify))
+      Wbem::Object.new self, 'Identity', post_data(build_soap(:identify))
     end
 
 
