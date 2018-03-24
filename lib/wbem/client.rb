@@ -26,19 +26,18 @@ module Wbem
 
     def enumerate(object, options = {})
       resp = post_data(build_soap(:enumerate, options.merge(resource_uri: object)))
-      enum_ns = resp.namespaces.find { |k,v| v == 'http://schemas.xmlsoap.org/ws/2004/09/enumeration' }.first.split(':').last
 
       data = []
 
       begin
-        ctx = resp.at_xpath("//#{enum_ns}:EnumerationContext").text
+        ctx = resp.at_xpath("//*[local-name()='EnumerationContext']").text
         resp = post_data(build_soap(:pull, options.merge(context: ctx, resource_uri: object)))
 
         data << resp
-      end while resp.xpath("//#{enum_ns}:EnumerationContext").any?
+      end while resp.xpath("//*[local-name()='EnumerationContext']").any?
 
       data.map do |d|
-        Wbem::Object.new self, object, d.at_xpath("//#{enum_ns}:Items").child
+        Wbem::Object.new self, object, d.at_xpath("//*[local-name()='Items']").child
       end
     end
 

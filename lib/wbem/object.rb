@@ -8,9 +8,7 @@ module Wbem
       @client = client_
       @resource_uri = URI.parse uri
       @node = node_
-      
-      ns = node.namespaces.find { |k,v| v == 'http://www.w3.org/2003/05/soap-envelope' }.first.split(':').last rescue ""
-      @body = node.at_xpath(".//#{ns}:Body").child rescue node
+      @body = node.at_xpath(".//*[local-name()='Body']").child rescue node
     end
 
     def classname
