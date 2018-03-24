@@ -3,6 +3,7 @@ require 'net/http/digest_auth'
 require 'nokogiri'
 require 'securerandom'
 require 'uri'
+require 'wbem/object'
 
 module Wbem
   class Client
@@ -23,8 +24,27 @@ module Wbem
     end
 
 
-    def get(object)
-      post_data(build_soap(:get, resource_uri: object))
+    def enumerate(object, options = {})
+      resp = post_data(build_soap(:enumerate, options.merge(resource_uri: object)))
+      enum_ns = resp.namespaces.find { |k,v| v == 'http://schemas.xmlsoap.org/ws/2004/09/enumeration' }.first.split(':').last
+
+      data = []
+
+      begin
+        ctx = resp.at_xpath("//#{enum_ns}:EnumerationContext").text
+        resp = post_data(build_soap(:pull, options.merge(context: ctx, resource_uri: object)))
+
+        data << resp
+      end while resp.xpath("//#{enum_ns}:EnumerationContext").any?
+
+      data.map do |d|
+        Wbem::Object.new self, object, d.at_xpath("//#{enum_ns}:Items").child
+      end
+    end
+
+    def get(object, options = {})
+      obj = post_data(build_soap(:get, options.merge(resource_uri: object)))
+      Wbem::Object.new self, object, obj 
     end
 
     def host
@@ -80,8 +100,8 @@ module Wbem
             if method != :identify
               xml['a'].Action("#{actionNS}/#{invoke_command || (method.to_s.capitalize)}")
               xml['a'].To(@url.path)
-              xml['a'].ResourceURI(options[:resource_uri])
-              xml['a'].MessageID(SecureRandom.uuid)
+              xml['w'].ResourceURI(options[:resource_uri])
+              xml['a'].MessageID("uuid:#{SecureRandom.uuid}")
               xml['a'].ReplyTo {
                 xml['a'].Address('http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous')
               }
@@ -134,13 +154,13 @@ module Wbem
                 yield xml if block_given?
               }
             elsif method == :enumerate || method == :pull
-              xml['n'].send method.to_s.capitalize.to_sym {
-                yield xml if block_given?
+              xml['n'].send(method.to_s.capitalize.to_sym) {
+                # xml['w'].MaxElements(32000)
 
-                xml['n'].MaxElements(32000)
-
-                xml['n'].OptimizeEnumeration if method == :enumerate
+                # xml['w'].OptimizeEnumeration if method == :enumerate
                 xml['n'].EnumerationContext(options[:context]) if method == :pull
+
+                yield xml if block_given?
               }
             else
               yield xml if block_given?
@@ -151,8 +171,8 @@ module Wbem
     end
 
     def post_data(xml)
-      xml = xml.to_xml(indent: 0) unless xml.is_a? String
-      logger.info xml.inspect
+      xml = '<?xml version="1.0"?>' + xml.to_xml(save_with: Nokogiri::XML::Node::SaveOptions::AS_XML | Nokogiri::XML::Node::SaveOptions::NO_DECLARATION).strip unless xml.is_a? String
+      logger.debug xml.inspect
 
       req = Net::HTTP::Post.new @url.request_uri
       req.content_type = 'application/xml; charset=utf-8'
@@ -175,6 +195,8 @@ module Wbem
       end
 
       if resp #.is_a? Net::HTTPOK
+        logger.debug resp.body
+
         return Nokogiri::XML(resp.body)
       else
         nil # TODO: Exceptions
@@ -187,6 +209,11 @@ module Wbem
         auth.next_nonce
         auth
       end
+    end
+
+    def message_id
+      @message_id ||= 0
+      @message_id += 1
     end
 
     def print_http(http)
