@@ -48,6 +48,14 @@ module Wbem
       Wbem::Object.new self, object, obj 
     end
 
+    def invoke(object, method, options = {})
+      obj = post_data(build_soap(:invoke, options.merge(resource_uri: object, command: method)) do |xml|
+        yield xml if block_given?
+      end
+      )
+      Wbem::Object.new self, object, obj
+    end
+
     def host
       @url.host
     end
