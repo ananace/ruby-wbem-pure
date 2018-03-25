@@ -36,7 +36,9 @@ module Wbem
         data << resp
       end while resp.xpath("//*[local-name()='EnumerationContext']").any?
 
-      data.map do |d|
+      data.select do |d|
+        d.at_xpath("//*[local-name()='Items']").children.any?
+      end.map do |d|
         Wbem::Object.new self, object, d.at_xpath("//*[local-name()='Items']").child
       end
     end
