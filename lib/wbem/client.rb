@@ -164,9 +164,11 @@ module Wbem
               }
             elsif method == :enumerate || method == :pull
               xml['n'].send(method.to_s.capitalize.to_sym) {
-                # xml['w'].MaxElements(32000)
+                if method == :enumerate
+                  xml['w'].OptimizeEnumeration
+                  xml['w'].MaxElements(32000)
+                end
 
-                # xml['w'].OptimizeEnumeration if method == :enumerate
                 xml['n'].EnumerationContext(options[:context]) if method == :pull
 
                 yield xml if block_given?
