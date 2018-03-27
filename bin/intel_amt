@@ -1,0 +1,6 @@
+#!/usr/env ruby
+
+require 'bundler/setup'
+require 'wbem'
+
+# TODO

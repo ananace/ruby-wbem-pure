@@ -23,18 +23,20 @@ module Wbem
       Wbem::Object.new self, 'Identity', post_data(build_soap(:identify))
     end
 
-
     def enumerate(object, options = {})
       resp = post_data(build_soap(:enumerate, options.merge(resource_uri: object)))
 
       data = []
 
-      begin
+      loop do
         ctx = resp.at_xpath("//*[local-name()='EnumerationContext']").text
         resp = post_data(build_soap(:pull, options.merge(context: ctx, resource_uri: object)))
 
         data << resp
-      end while resp.xpath("//*[local-name()='EnumerationContext']").any?
+
+        break if resp.xpath("//*[local-name()='EndOfSequence']").any? \
+              || resp.xpath("//*[local-name()='EnumerationContext']").none?
+      end
 
       data.select do |d|
         d.at_xpath("//*[local-name()='Items']").children.any?
@@ -45,13 +47,14 @@ module Wbem
 
     def get(object, options = {})
       obj = post_data(build_soap(:get, options.merge(resource_uri: object)))
-      Wbem::Object.new self, object, obj 
+      Wbem::Object.new self, object, obj
     end
 
     def invoke(object, method, options = {})
-      obj = post_data(build_soap(:invoke, options.merge(resource_uri: object, command: method)) do |xml|
-        yield xml if block_given?
-      end
+      obj = post_data(
+        build_soap(:invoke, options.merge(resource_uri: object, command: method)) do |xml|
+          yield xml if block_given?
+        end
       )
       Wbem::Object.new self, object, obj
     end
@@ -69,9 +72,7 @@ module Wbem
     def build_soap(method, options = {})
       method = method.to_s.downcase.to_sym
       namespaces = options[:namespaces] || {}
-      namespaces.merge!(
-        'xmlns' => 'http://www.w3.org/2003/05/soap-envelope',
-      )
+      namespaces['xmlns'] = 'http://www.w3.org/2003/05/soap-envelope'
 
       if method != :identify
         namespaces.merge!(
@@ -80,34 +81,30 @@ module Wbem
           'xmlns:p' => 'http://schemas.microsoft.com/wbem/wsman/1/wsman.xsd'
         )
 
-        if method == :enumerate || method == :pull
-          namespaces.merge!(
-            'xmlns:n' => 'http://schemas.xmlsoap.org/ws/2004/09/enumeration'
-          )
-        end
+        namespaces['xmlns:n'] = 'http://schemas.xmlsoap.org/ws/2004/09/enumeration' \
+          if %i[enumerate pull].include? method
 
-        namespaces.merge!(
-          'xmlns:b' => 'http://schemas.dmtf.org/wbem/wsman/1/cimbinding.xsd'
-        ) if method == :enumerate
+        namespaces['xmlns:b'] = 'http://schemas.dmtf.org/wbem/wsman/1/cimbinding.xsd' \
+          if method == :enumerate
       end
 
-      actionNS = case method
-                 when :create, :delete, :get, :put
-                   'http://schemas.xmlsoap.org/ws/2004/09/transfer'
-                 when :subscribe, :unsubscribe
-                   'http://schemas.xmlsoap.org/ws/2004/08/eventing'
-                 when :enumerate, :pull
-                   'http://schemas.xmlsoap.org/ws/2004/09/enumeration'
-                 when :invoke
-                   options[:resource_uri]
-                 end
+      action_ns = case method
+                  when :create, :delete, :get, :put
+                    'http://schemas.xmlsoap.org/ws/2004/09/transfer'
+                  when :subscribe, :unsubscribe
+                    'http://schemas.xmlsoap.org/ws/2004/08/eventing'
+                  when :enumerate, :pull
+                    'http://schemas.xmlsoap.org/ws/2004/09/enumeration'
+                  when :invoke
+                    options[:resource_uri]
+                  end
       invoke_command = options[:command]
 
       Nokogiri::XML::Builder.new do |xml|
         xml.Envelope(namespaces) {
           xml.Header {
             if method != :identify
-              xml['a'].Action("#{actionNS}/#{invoke_command || (method.to_s.capitalize)}")
+              xml['a'].Action("#{action_ns}/#{invoke_command || method.to_s.capitalize}")
               xml['a'].To(@url.path)
               xml['w'].ResourceURI(options[:resource_uri])
               xml['a'].MessageID("uuid:#{SecureRandom.uuid}")
@@ -116,7 +113,7 @@ module Wbem
               }
               xml['w'].OperationTimeout('PT60S')
               xml['w'].SelectorSet {
-                options[:selectors].each do |k,v|
+                options[:selectors].each do |k, v|
                   xml['w'].Selector(v.to_s, 'Name' => k.to_s)
                 end
               } if options[:selectors] && options[:selectors].any?
@@ -162,11 +159,11 @@ module Wbem
               xml.send "#{invoke_command}_INPUT".to_sym, 'xmlns' => options[:resource_uri] {
                 yield xml if block_given?
               }
-            elsif method == :enumerate || method == :pull
+            elsif %i[enumerate pull].include? method
               xml['n'].send(method.to_s.capitalize.to_sym) {
                 if method == :enumerate
                   xml['w'].OptimizeEnumeration
-                  xml['w'].MaxElements(32000)
+                  xml['w'].MaxElements(32_000)
                 end
 
                 xml['n'].EnumerationContext(options[:context]) if method == :pull
@@ -235,16 +232,16 @@ module Wbem
       else
         logger.debug "#{dir} #{http.code} #{http.message}"
       end
-      http.each_header do |k,v|
+      http.each_header do |k, v|
         logger.debug "#{dir} #{k}: #{v}"
       end
-      logger.debug "#{dir}"
+      logger.debug dir
     end
 
     def logger
       Wbem.logger
     end
-      
+
     attr_reader :connection
   end
 end
