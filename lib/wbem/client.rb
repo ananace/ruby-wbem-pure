@@ -184,12 +184,14 @@ module Wbem
 
       req = Net::HTTP::Post.new @url.request_uri
       req.content_type = 'application/xml; charset=utf-8'
-      req.body = xml
+      req.body = xml if @auth_method == :basic
       print_http(req)
 
       resp = connection.request req
       print_http(resp)
       if resp.is_a? Net::HTTPUnauthorized
+        @auth_method = :digest if resp['www-authenticate'].start_with? 'Digest'
+
         auth = digest_auth.auth_header @url, resp['www-authenticate'], 'POST'
 
         req = Net::HTTP::Post.new @url.request_uri
