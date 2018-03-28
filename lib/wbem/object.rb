@@ -9,7 +9,8 @@ module Wbem
       @resource_uri = URI.parse uri
       @node = node_
       @body = node.at_xpath(".//*[local-name()='Body']")
-      @body = @body.child if @body && @body.children.any?
+      @body = @body.child if @body && @body.children.any? && @body.child
+      @body ||= node
     end
 
     def classname
