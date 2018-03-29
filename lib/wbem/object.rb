@@ -29,6 +29,16 @@ module Wbem
       attributes[name]
     end
 
+    def invoke(method, args = {})
+      client.invoke(resource_uri.to_s, method, selectors) do |x|
+        args.each do |k, v|
+          x.send k.to_sym, v
+        end
+
+        yield x if block_given?
+      end
+    end
+
     def reload
       @node = client.get(resource_uri, selectors).body.document
       load_body
@@ -65,7 +75,7 @@ module Wbem
         ) do
           x['a'].Address('http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous')
           x['a'].ReferenceParameters do
-            x['w'].ResourceURI(resource_uri)
+            x['w'].ResourceURI(resource_uri.to_s)
             x << selectors(:xml).to_xml(
               save_with: Nokogiri::XML::Node::SaveOptions::AS_XML |
                          Nokogiri::XML::Node::SaveOptions::NO_DECLARATION
