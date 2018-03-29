@@ -23,14 +23,14 @@ module Wbem
       Wbem::Object.new self, 'Identity', post_data(build_soap(:identify))
     end
 
-    def enumerate(object, options = {})
-      resp = post_data(build_soap(:enumerate, options.merge(resource_uri: object)))
+    def enumerate(object, selectors = {})
+      resp = post_data(build_soap(:enumerate, resource_uri: object, selectors: selectors))
 
       data = []
 
       loop do
         ctx = resp.at_xpath("//*[local-name()='EnumerationContext']").text
-        resp = post_data(build_soap(:pull, options.merge(context: ctx, resource_uri: object)))
+        resp = post_data(build_soap(:pull, context: ctx, resource_uri: object, selectors: selectors))
 
         data << resp
 
@@ -45,14 +45,14 @@ module Wbem
       end
     end
 
-    def get(object, options = {})
-      obj = post_data(build_soap(:get, options.merge(resource_uri: object)))
+    def get(object, selectors = {})
+      obj = post_data(build_soap(:get, resource_uri: object, selectors: selectors))
       Wbem::Object.new self, object, obj
     end
 
-    def invoke(object, method, options = {})
+    def invoke(object, method, selectors = {})
       obj = post_data(
-        build_soap(:invoke, options.merge(resource_uri: object, command: method)) do |xml|
+        build_soap(:invoke, resource_uri: object, command: method, selectors: selectors) do |xml|
           yield xml if block_given?
         end
       )

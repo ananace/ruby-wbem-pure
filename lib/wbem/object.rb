@@ -1,3 +1,4 @@
+require 'nokogiri'
 require 'uri'
 
 module Wbem
@@ -6,11 +7,10 @@ module Wbem
 
     def initialize(client_, uri, node_)
       @client = client_
-      @resource_uri = URI.parse uri
+      @resource_uri = uri
+      @resource_uri = URI.parse resource_uri unless resource_uri.is_a? URI
       @node = node_
-      @body = node.at_xpath(".//*[local-name()='Body']")
-      @body = @body.child if @body && @body.children.any? && @body.child
-      @body ||= node
+      load_body
     end
 
     def classname
@@ -29,8 +29,62 @@ module Wbem
       attributes[name]
     end
 
+    def reload
+      @node = client.get(resource_uri, selectors).body.document
+      load_body
+      self
+    end
+
+    def selectors(scheme = :hash)
+      chosen = attributes.select do |k, _v|
+        %w[CreationClassName InstanceID Name SystemCreationClassName SystemName Tag].include?(k)
+      end
+
+      if chosen.key? 'InstanceID'
+        chosen = { 'InstanceID' => chosen['InstanceID'] }
+      end
+
+      if scheme == :xml
+        Nokogiri::XML::Builder.new do |x|
+          x['w'].SelectorSet('xmlns:w' => 'http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd') do
+            chosen.each do |k, v|
+              x['w'].Selector(v, 'Name' => k)
+            end
+          end
+        end.doc
+      elsif scheme == :hash
+        chosen
+      end
+    end
+
+    def to_epr
+      Nokogiri::XML::Builder.new do |x|
+        x['a'].EndpointReference(
+          'xmlns:a' => 'http://schemas.xmlsoap.org/ws/2004/08/addressing',
+          'xmlns:w' => 'http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd'
+        ) do
+          x['a'].Address('http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous')
+          x['a'].ReferenceParameters do
+            x['w'].ResourceURI(resource_uri)
+            x << selectors(:xml).to_xml(
+              save_with: Nokogiri::XML::Node::SaveOptions::AS_XML |
+                         Nokogiri::XML::Node::SaveOptions::NO_DECLARATION
+            ).strip
+          end
+        end
+      end.doc
+    end
+
     def to_s
       "#{classname}:\n#{attributes.map { |k, v| "  #{k}: #{v.inspect}" }.join "\n"}"
+    end
+
+    private
+
+    def load_body
+      @body = node.at_xpath(".//*[local-name()='Body']")
+      @body = @body.child if @body && @body.children.any? && @body.child
+      @body ||= node
     end
   end
 end
