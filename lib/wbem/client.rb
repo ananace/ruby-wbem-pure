@@ -2,10 +2,8 @@
 
 require 'net/http'
 require 'net/http/digest_auth'
-require 'nokogiri'
 require 'securerandom'
-require 'uri'
-require 'wbem/object'
+require 'wbem'
 
 module Wbem
   class Client

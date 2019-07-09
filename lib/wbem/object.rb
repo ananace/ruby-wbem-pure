@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'nokogiri'
-require 'uri'
+require 'wbem'
 
 module Wbem
   class Object

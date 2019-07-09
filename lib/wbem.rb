@@ -1,10 +1,17 @@
 # frozen_string_literal: true
 
 require 'logging'
+require 'nokogiri'
+require 'uri'
 require 'wbem/client'
 require 'wbem/version'
 
+
 module Wbem
+  autoload :Object, 'wbem/object'
+  autoload :ERRORS, 'wbem/constants'
+  autoload :DEFAULT_NAMESPACE, 'wbem/constants'
+
   def self.connect(url)
     Wbem::Client.new url
   end
