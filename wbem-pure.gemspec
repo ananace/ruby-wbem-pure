@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
   spec.license       = 'MIT'
 
   spec.extra_rdoc_files = ['LICENSE.txt', 'README.md']
-  spec.files            = Dir['{bin,lib}/**'] + spec.extra_rdoc_files
+  spec.files            = Dir['{bin,lib}/**/*'] + spec.extra_rdoc_files
   spec.executables      = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
 
   spec.add_dependency 'logging', '~> 2.2'
