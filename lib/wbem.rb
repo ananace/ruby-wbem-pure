@@ -11,9 +11,11 @@ module Wbem
 
   def self.logger
     @logger ||= begin
-      log = Logging.logger['wbem']
+      log = Logging.logger[self]
       log.add_appenders Logging.appenders.stdout
       log
     end
   end
 end
+
+Wbem.logger
