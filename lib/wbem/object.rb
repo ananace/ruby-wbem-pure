@@ -1,16 +1,17 @@
+# frozen_string_literal: true
+
 require 'nokogiri'
 require 'uri'
 
 module Wbem
   class Object
-    attr_reader :client, :resource_uri, :node, :body
+    attr_reader :client, :resource_uri, :node
 
     def initialize(client_, uri, node_)
       @client = client_
       @resource_uri = uri
       @resource_uri = URI.parse resource_uri unless resource_uri.is_a? URI
       @node = node_
-      load_body
     end
 
     def classname
@@ -89,9 +90,9 @@ module Wbem
       "#{classname}:\n#{attributes.map { |k, v| "  #{k}: #{v.inspect}" }.join "\n"}"
     end
 
-    private
+    def body
+      return @body if @body
 
-    def load_body
       @body = node.at_xpath(".//*[local-name()='Body']")
       @body = @body.child if @body && @body.children.any? && @body.child
       @body ||= node

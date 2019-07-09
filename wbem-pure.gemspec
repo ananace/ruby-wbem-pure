@@ -1,6 +1,6 @@
-lib = File.expand_path('../lib', __FILE__)
-$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'wbem/version'
+# frozen_string_literal: true
+
+require File.join(File.expand_path('lib', __dir__), 'wbem/version')
 
 Gem::Specification.new do |spec|
   spec.name          = 'wbem-pure'
@@ -13,12 +13,9 @@ Gem::Specification.new do |spec|
   spec.homepage      = 'https://github.com/ananace/ruby-wbem-pure'
   spec.license       = 'MIT'
 
-  spec.files         = `git ls-files -z`.split("\x0").reject do |f|
-    f.match(%r{^(test|spec|features)/})
-  end
-  spec.bindir        = 'exe'
-  spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
-  spec.require_paths = ['lib']
+  spec.extra_rdoc_files = ['LICENSE.txt', 'README.md']
+  spec.files            = Dir['{bin,lib}/**'] + spec.extra_rdoc_files
+  spec.executables      = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
 
   spec.add_dependency 'logging', '~> 2.2'
   spec.add_dependency 'net-http-digest_auth', '~> 1.4'

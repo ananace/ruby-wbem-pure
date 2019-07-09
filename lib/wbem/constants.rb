@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Wbem
   ERRORS = {
     CIM_ERR_UNKNOWN: 'Unknown error occurred',
@@ -29,5 +31,5 @@ module Wbem
     CIM_ERR_SERVER_IS_SHUTTING_DOWN: 'WBEM server is shutting down'
   }.freeze
 
-  DEFAULT_NAMESPACE = 'root/cimv2'.freeze
+  DEFAULT_NAMESPACE = 'root/cimv2'
 end

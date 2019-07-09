@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'net/http'
 require 'net/http/digest_auth'
 require 'nokogiri'
@@ -38,11 +40,8 @@ module Wbem
               || resp.xpath("//*[local-name()='EnumerationContext']").none?
       end
 
-      data.select do |d|
-        d.at_xpath("//*[local-name()='Items']").children.any?
-      end.map do |d|
-        Wbem::Object.new self, object, d.at_xpath("//*[local-name()='Items']").child
-      end
+      data.select { |d| d.at_xpath("//*[local-name()='Items']").children.any? }
+          .map { |d| Wbem::Object.new self, object, d.at_xpath("//*[local-name()='Items']").child }
     end
 
     def get(object, selectors = {})
@@ -69,7 +68,7 @@ module Wbem
 
     private
 
-    def build_soap(method, options = {})
+    def build_soap(method, **options)
       method = method.to_s.downcase.to_sym
       namespaces = options[:namespaces] || {}
       namespaces['xmlns'] = 'http://www.w3.org/2003/05/soap-envelope'
@@ -101,66 +100,78 @@ module Wbem
       invoke_command = options[:command]
 
       Nokogiri::XML::Builder.new do |xml|
-        xml.Envelope(namespaces) {
-          xml.Header {
+        xml.Envelope(namespaces) do
+
+          xml.Header do
             if method != :identify
               xml['a'].Action("#{action_ns}/#{invoke_command || method.to_s.capitalize}")
               xml['a'].To(@url.path)
               xml['w'].ResourceURI(options[:resource_uri])
               xml['a'].MessageID("uuid:#{SecureRandom.uuid}")
-              xml['a'].ReplyTo {
+              xml['a'].ReplyTo do
                 xml['a'].Address('http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous')
-              }
+              end
+
               xml['w'].OperationTimeout('PT60S')
-              xml['w'].SelectorSet {
-                options[:selectors].each do |k, v|
-                  xml['w'].Selector(v.to_s, 'Name' => k.to_s)
+              if options[:selectors]&.any?
+                xml['w'].SelectorSet do
+                  options[:selectors].each do |k, v|
+                    xml['w'].Selector(v.to_s, 'Name' => k.to_s)
+                  end
                 end
-              } if options[:selectors] && options[:selectors].any?
-              xml['t'].IssuedTokens('xmlns:t' => 'http://schemas.xmlsoap.org/ws/2005/02/trust', 'xmlns:se' => 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd') {
-                xml['t'].RequestSecurityTokenResponse {
-                  xml['t'].TokenType('http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#UsernameToken')
-                  xml['t'].RequestedSecurityToken {
-                    xml['se'].UsernameToken {
-                      xml['se'].Username(options[:username])
-                      xml['se'].Password(options[:password], 'Type' => 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PasswordText')
-                    }
-                  }
-                }
-              } if method == :subscribe && (options[:username] && options[:password])
+              end
+
+              if method == :subscribe && (options[:username] && options[:password])
+                xml['t'].IssuedTokens('xmlns:t' => 'http://schemas.xmlsoap.org/ws/2005/02/trust',
+                                      'xmlns:se' => 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd') do
+                  xml['t'].RequestSecurityTokenResponse do
+                    xml['t'].TokenType('http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#UsernameToken')
+                    xml['t'].RequestedSecurityToken do
+                      xml['se'].UsernameToken do
+                        xml['se'].Username(options[:username])
+                        xml['se'].Password(options[:password], 'Type' => 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PasswordText')
+                      end
+                    end
+                  end
+                end
+              end
             end
-          }
-          xml.Body {
+          end
+
+          xml.Body do
             if method == :identify
               xml.Identify('xmlns' => 'http://schemas.dmtf.org/wbem/wsman/identity/1/wsmanidentity.xsd')
             elsif method == :unsubscribe
               xml['e'].Unsubscribe 'xmlns:e' => 'http://schemas.xmlsoap.org/ws/2004/08/eventing'
             elsif method == :subscribe
-              xml['e'].Subscribe('xmlns:e' => 'http://schemas.xmlsoap.org/ws/2004/08/eventing') {
+              xml['e'].Subscribe('xmlns:e' => 'http://schemas.xmlsoap.org/ws/2004/08/eventing') do
                 delivery_scheme = case options[:delivery_mode]
                                   when :push
                                     'http://schemas.xmlsoap.org/ws/2004/08/eventing/DeliveryModes/Push'
                                   when :push_with_ack
                                     'http://schemas.dmtf.org/wbem/wsman/1/wsman/PushWithAck'
                                   end
-                xml['e'].Delivery('Mode' => delivery_scheme) {
-                  xml['e'].NotifyTo {
+
+                xml['e'].Delivery('Mode' => delivery_scheme) do
+                  xml['e'].NotifyTo do
                     xml['a'].Address(options[:notify_url])
-                    xml['a'].ReferenceParameters {
-                      xml['m'].arg(options[:opaque], 'xmlns:m' => 'http://x.com')
-                    } if options[:opaque]
-                  }
+                    if options[:opaque]
+                      xml['a'].ReferenceParameters do
+                        xml['m'].arg(options[:opaque], 'xmlns:m' => 'http://x.com')
+                      end
+                    end
+                  end
 
                   xml['w'].Auth('Profile' => 'http://schemas.dmtf.org/wbem/wsman/1/wsman/secprofile/http/digest') \
                     if options[:username] && options[:password]
-                }
-              }
+                end
+              end
             elsif method == :invoke
-              xml.send "#{invoke_command}_INPUT".to_sym, 'xmlns' => options[:resource_uri] {
+              xml.send "#{invoke_command}_INPUT".to_sym, 'xmlns' => options[:resource_uri] do
                 yield xml if block_given?
-              }
+              end
             elsif %i[enumerate pull].include? method
-              xml['n'].send(method.to_s.capitalize.to_sym) {
+              xml['n'].send(method.to_s.capitalize.to_sym) do
                 if method == :enumerate
                   xml['w'].OptimizeEnumeration
                   xml['w'].MaxElements(32_000)
@@ -169,12 +180,12 @@ module Wbem
                 xml['n'].EnumerationContext(options[:context]) if method == :pull
 
                 yield xml if block_given?
-              }
-            else
-              yield xml if block_given?
+              end
+            elsif block_given?
+              yield xml
             end
-          }
-        }
+          end
+        end
       end
     end
 
@@ -204,13 +215,13 @@ module Wbem
         print_http(resp)
       end
 
-      if resp #.is_a? Net::HTTPOK
+      if resp # .is_a? Net::HTTPOK
         logger.debug resp.body
 
         return Nokogiri::XML(resp.body)
-      else
-        nil # TODO: Exceptions
       end
+
+      nil # TODO: Exceptions
     end
 
     def digest_auth
@@ -241,7 +252,7 @@ module Wbem
     end
 
     def logger
-      Wbem.logger
+      @logger ||= Logging.logger[self]
     end
 
     attr_reader :connection
