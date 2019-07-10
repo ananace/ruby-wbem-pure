@@ -6,11 +6,10 @@ require 'uri'
 require 'wbem/client'
 require 'wbem/version'
 
-
 module Wbem
-  autoload :Object, 'wbem/object'
   autoload :ERRORS, 'wbem/constants'
   autoload :DEFAULT_NAMESPACE, 'wbem/constants'
+  autoload :Object, 'wbem/object'
 
   def self.connect(url)
     Wbem::Client.new url
@@ -25,4 +24,5 @@ module Wbem
   end
 end
 
+# Just to initialize the root logger
 Wbem.logger

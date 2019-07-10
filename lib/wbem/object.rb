@@ -50,9 +50,7 @@ module Wbem
         %w[CreationClassName InstanceID Name SystemCreationClassName SystemName Tag].include?(k)
       end
 
-      if chosen.key? 'InstanceID'
-        chosen = { 'InstanceID' => chosen['InstanceID'] }
-      end
+      chosen = { 'InstanceID' => chosen['InstanceID'] } if chosen.key? 'InstanceID'
 
       if scheme == :xml
         Nokogiri::XML::Builder.new do |x|
@@ -93,7 +91,7 @@ module Wbem
       return @body if @body
 
       @body = node.at_xpath(".//*[local-name()='Body']")
-      @body = @body.child if @body && @body.children.any? && @body.child
+      @body = @body.child if @body&.children&.any? && @body&.child
       @body ||= node
     end
   end
